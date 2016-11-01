@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>2048</title>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:700' rel='stylesheet' type='text/css'>
+    <link href="css/styles.css" rel='stylesheet' type="text/css">
+
+</head>
+<body>
+
+<div class="gameBoard">
+    <div class="gameCell" data-row="0" data-col="0"></div>
+    <div class="gameCell" data-row="0" data-col="1"></div>
+    <div class="gameCell" data-row="0" data-col="2"></div>
+    <div class="gameCell" data-row="0" data-col="3"></div>
+    <div class="gameCell" data-row="1" data-col="0"></div>
+    <div class="gameCell" data-row="1" data-col="1"></div>
+    <div class="gameCell" data-row="1" data-col="2"></div>
+    <div class="gameCell" data-row="1" data-col="3"></div>
+    <div class="gameCell" data-row="2" data-col="0"></div>
+    <div class="gameCell" data-row="2" data-col="1"></div>
+    <div class="gameCell" data-row="2" data-col="2"></div>
+    <div class="gameCell" data-row="2" data-col="3"></div>
+    <div class="gameCell" data-row="3" data-col="0"></div>
+    <div class="gameCell" data-row="3" data-col="1"></div>
+    <div class="gameCell" data-row="3" data-col="2"></div>
+    <div class="gameCell" data-row="3" data-col="3"></div>
+</div>
+<center><button id="siguiente">Siguiente</button></center>
+<center><h3 id="score">0</h3></center>
+<center><h3 id="highScore">HighScore: 0</h3></center>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+<script src="js/boardMovement.js"></script>
+
+<script>
+
+    $('#siguiente').click(calculateNextMove);
+    var gameInterval = setInterval(calculateNextMove, 150);
+
+    var stairOrder = [[0,0],[1,0],[2,0],[3,0], [3,1],[2,1],[1,1],[0,1], [0,2],[1,2],[2,2],[3,2] ,[3,3],[2,3],[1,3],[0,3]];
+
+
+    //IA
+    function calculateNextMove(){
+        var firstDirection = tryFillingExistingStair();
+        if(firstDirection){
+            //console.error('1 - Primera elección');
+            checkAllCellsForMove(firstDirection);
+            return;
+        }
+
+
+        var cellObjective = getNextEmptyCellInStair();
+        var aSecondDirections = suggestionsToFillEmptyCellWithHigherValue(cellObjective[0],cellObjective[1]);
+        var sPreferredSecondDirection = prioritizeDirections(cellObjective[0],cellObjective[1], aSecondDirections);
+        if(sPreferredSecondDirection){
+            //console.error('2 - Llenado de 0 '+sPreferredSecondDirection);
+            checkAllCellsForMove(sPreferredSecondDirection);
+            return;
+        }
+
+
+        /*PARTE MIERDA*/
+        var canLeft = canMoveLeft();
+        var canUp = canMoveUp();
+
+
+        if(!canLeft && !canUp){
+            //console.error('OBLIGADO DOWN');
+            checkAllCellsForMove('down');
+        }
+        else if(canLeft && canUp){
+            var randomNumber = Math.floor(Math.random() * 100);
+            if(randomNumber % 2 == 0){
+                //console.error('RANDOM UP');
+                checkAllCellsForMove('up');
+            }
+            else{
+                //console.error('RANDOM LEFT');
+                checkAllCellsForMove('left');
+            }
+        }
+        else if(canLeft){
+            //console.error('UNICA OPCIÓN LOGICA left');
+            checkAllCellsForMove('left');
+        }
+        else{
+            //console.error('UNICA OPCIÓN LOGICA up');
+            checkAllCellsForMove('up');
+        }
+        /*PARTE MIERDA*/
+
+
+
+        return;
+
+        /*var finalDirection = checkSurroundingCellsWithSugestion(cellObjective[0], cellObjective[1], possibleDirection);
+        console.log('Elijo: '+finalDirection);
+        checkAllCellsForMove(finalDirection);*/
+    }
+
+    /*EASY*/
+    function tryFillingExistingStair(){
+        for(var i = 0; i < 16; i++) {
+            var currentCellX = stairOrder[i][0];
+            var currentCellY = stairOrder[i][1];
+            var currentCellValue = boardSituation[currentCellX][currentCellY];
+            if(currentCellValue == 0){
+                return false;
+            }
+
+            var direction = checkSurroundingCells(currentCellX, currentCellY);
+            if(direction){
+                return direction;
+            }
+        }
+    }
+
+    function checkSurroundingCells(cellX, cellY){
+        var currentCellValue = boardSituation[cellX][cellY]
+        for(var i = (cellY+1); i < 4; i++){
+            if(boardSituation[cellX][i] != 0){
+                if(boardSituation[cellX][i] == currentCellValue){
+                    return 'left';
+                }
+                break;
+            }
+
+        }
+        for(var i = (cellX+1); i < 4; i++){
+            if(boardSituation[i][cellY] != 0){
+                if(boardSituation[i][cellY] == currentCellValue){
+                    return 'up';
+                }
+                break;
+            }
+
+        }
+        for(var i = (cellX-1); i > -1; i--){
+            if(boardSituation[i][cellY] != 0){
+                if(boardSituation[i][cellY] == currentCellValue){
+                    return 'down';
+                }
+                break;
+            }
+        }
+        for(var i = (cellY-1); i > -1; i--){
+            if(boardSituation[cellX][i] != 0){
+                if(boardSituation[cellX][i] == currentCellValue){
+                    return 'right';
+                }
+                break;
+            }
+        }
+
+
+        return false;
+    }
+    /*EASY*/
+
+    /*MEDIUM*/
+    function getLastCellInStair(){
+        var lastValue = 99999;
+        for(var i = 0; i < 16; i++) {
+            var currentCellX = stairOrder[i][0];
+            var currentCellY = stairOrder[i][1];
+            var currentCellValue = boardSituation[currentCellX][currentCellY];
+            if(currentCellValue == 0 || currentCellValue >= lastValue){
+                if(i == 0){
+                    return [0,0];
+                }
+                else{
+                    return [stairOrder[(i-1)][0],stairOrder[(i-1)][1]];
+                }
+
+            }
+            lastValue = currentCellValue;
+        }
+    }
+
+    function prioritizeDirections(cellX, cellY, aDirections){
+
+        if(cellY % 2 == 0){
+            if($.inArray('up', aDirections) != -1){
+                return 'up';
+            }
+        }
+        else{
+            //prefiero abajo, columnas 1 3
+            if($.inArray('down', aDirections) != -1){
+                return 'down';
+            }
+        }
+
+        if($.inArray('left', aDirections) != -1){
+            return 'left';
+        }
+
+        return null;
+    }
+
+    function getNextEmptyCellInStair(){
+        var previousValue = boardSituation[0][0];
+
+        for(var i = 0; i < 16; i++){
+            var actualCellPos = stairOrder[i];
+            var actualBoardCellValue = boardSituation[actualCellPos[0]][actualCellPos[1]];
+
+            if(actualBoardCellValue == 0){
+                actualCellPos[2] = previousValue;
+                return actualCellPos;
+            }
+            previousValue = actualBoardCellValue;
+        }
+        console.log('TODO SE HA IDO A LA MIERDA');
+        clearInterval(gameInterval);
+    }
+
+    function suggestionsToFillEmptyCellWithHigherValue(cellX, cellY){
+        var aPossibleDirections = [];
+        var previousCell = getLastCellInStair();
+        var previousCellValue = boardSituation[previousCell[0]][previousCell[1]];
+
+
+        //left
+        for(var i = (cellY+1); i < 4; i++){
+            if(boardSituation[cellX][i] != 0){
+                if(boardSituation[cellX][i] <= previousCellValue || previousCellValue == 0){
+                    aPossibleDirections.push('left');
+                }
+                break;
+            }
+        }
+
+        //up
+        for(var i = (cellX+1); i < 4; i++){
+            if(boardSituation[i][cellY] != 0){
+                if(boardSituation[i][cellY] <= previousCellValue || previousCellValue == 0){
+                    aPossibleDirections.push('up');
+                }
+                break;
+            }
+
+        }
+
+        //down
+        for(var i = (cellX-1); i > -1; i--){
+            if(boardSituation[i][cellY] != 0){
+                if(boardSituation[i][cellY] <= previousCellValue || previousCellValue == 0){
+                    aPossibleDirections.push('down');
+                }
+                break;
+            }
+        }
+
+        //right
+        for(var i = (cellY-1); i > -1; i--){
+            if(boardSituation[cellX][i] != 0){
+                if(boardSituation[cellX][i] <= previousCellValue || previousCellValue == 0){
+                    aPossibleDirections.push('right');
+                }
+                break;
+            }
+        }
+
+        return aPossibleDirections;
+    }
+    /*MEDIUM*/
+
+
+    /*UNUSED*/
+    function getAllowedDirections(cellX, cellY){
+        if(cellY == 0 || cellY == 2){
+            return 'up';
+        }
+        else{
+            return 'down';
+        }
+    }
+
+    function checkSurroundingCellsWithSugestion(cellX, cellY, direction){
+        for(var i = (cellY+1); i < 3; i++){
+            if(boardSituation[cellX][i] == boardSituation[cellX][cellY]){
+                return 'left';
+            }
+        }
+        for(var i = (cellX+1); i < 3; i++){
+            if(boardSituation[i][cellY] == boardSituation[cellX][cellY]){
+                return direction;
+            }
+        }
+
+        var randomNumber = Math.floor(Math.random() * 10) + 1;
+        if(randomNumber % 2 == 0){
+            return direction;
+        }
+        else{
+            return 'left';
+        }
+    }
+
+
+    /*HELPERS*/
+    function canMoveUp(){
+        var notEmpty = false;
+        for(var j = 0; j<4; j++){//vertical
+            for(var i = 3; i>-1; i--){//horizontal
+                if(boardSituation[i][j] == 0 && notEmpty){
+                    return true;
+                }
+                if(boardSituation[i][j] != 0){
+                    notEmpty = true;
+                }
+            }
+            notEmpty = false;
+        }
+        return false;
+    }
+
+    function canMoveLeft(){
+        var notEmpty = false;
+        for(var i = 0; i<4; i++){//vertical
+            for(var j = 3; j>-1; j--){//horizontal
+                if(boardSituation[i][j] == 0 && notEmpty){
+                    return true;
+                }
+                if(boardSituation[i][j] != 0){
+                    notEmpty = true;
+                }
+            }
+            notEmpty = false;
+        }
+        return false;
+    }
+    /*HELPERS*/
+</script>
+</body>
+</html>
